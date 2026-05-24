@@ -5,24 +5,20 @@ import { getState, updateState } from './modules/state.js';
 import { GoogleGenerativeAI } from "https://cdn.jsdelivr.net/npm/@google/generative-ai@0.1.3/dist/index.min.js";
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js"; // Core Firebase app
 import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-analytics.js"; // Analytics
-import { ADMIN_EMAIL, mensajesExito, mensajesFallo, competenciasMapa, weeks, tiendaItems, logrosDefiniciones, GEMINI_API_KEY, COLLECTIVE_CHALLENGE_GOAL } from './modules/constants.js'; // Existing import
+// 🔒 CLAVES PRIVADAS: Se leen desde config.js (archivo local, NO versionado en GitHub)
+import { firebaseConfig, GEMINI_API_KEY, ADMIN_EMAIL } from './config.js';
+import { mensajesExito, mensajesFallo, competenciasMapa, weeks, tiendaItems, logrosDefiniciones, COLLECTIVE_CHALLENGE_GOAL } from './modules/constants.js'; // Existing import
 import { initializeAuth, setupAuthListener, loginWithGoogle, logoutUser } from './modules/auth.js'; // New import for auth module
 import { initializeFirestore, doc, setDoc, getDoc, updateDoc, increment, onSnapshot, addDoc, serverTimestamp, collection, query, where, orderBy, limit } from './modules/firestore.js'; // New import for firestore module
 import { initializeGamificationModule, getVidas, resetChallengeState, decrementVida, incrementFallo, unlockPista, cargarDatosGamificacion, abrirModalGamificacion, cerrarModalGamificacion, cambiarTabGamificacion, comprarArticulo, equiparArticulo, comprarPowerup, reclamarMonedas, ganarVolts, comprarEnergia, comprarPista, renderPistas, playCoinSound, playErrorSound, getMensajesExito, getMensajesFallo } from './modules/gamification.js'; // New import for gamification module
 import { initializeTeacherModule, iniciarAppDocente as teacherModuleIniciarAppDocente, renderTeacherDashboard, exportarCSV, cambiarTabDocente, renderTeacherManagementUI, addDocente, removeDocente, renderSecondaryTeacherUI, addMyGroup, removeMyGroup } from './modules/teacher.js'; // New import for teacher module
 
 // ==============================================================
-// 2. CONFIGURACIÓN EXACTA DE TU FIREBASE (CodeQuestPro)
+// 2. CONFIGURACIÓN DE FIREBASE
+// Las claves vienen de config.js (ignorado por .gitignore)
+// Para tu propio proyecto: copia config.example.js → config.js
+// y rellena con las claves de TU Firebase Console.
 // ==============================================================
-const firebaseConfig = {
-  apiKey: "AIzaSyDNBy-QKS5eNSinEI5ROOhR94YGKvbA0cg",
-  authDomain: "codequestpro-78796.firebaseapp.com",
-  projectId: "codequestpro-78796",
-  storageBucket: "codequestpro-78796.firebasestorage.app",
-  messagingSenderId: "383335669814",
-  appId: "1:383335669814:web:70d1fd4e04b77aca63f897",
-  measurementId: "G-V7GPL7TEQC"
-};
 
 const app = initializeApp(firebaseConfig);
 const analytics = getAnalytics(app); // Analytics is still directly imported as it's not a core service like Auth/Firestore
