@@ -23,7 +23,7 @@
   <div class="login-container" style="text-align: center;">
     <h1 class="login-title flex-icon" style="justify-content: center;"><i data-lucide="cloud"></i> Wokwi Academy</h1>
     <p style="color: var(--text-muted); margin-bottom: 25px; font-size: 0.95rem;">
-      Acceso exclusivo para estudiantes matriculados
+      Acceso exclusivo para estudiantes matriculados con cuenta Google
     </p>
     
     <button id="btn-login-google" class="btn-login" style="background: white; color: #333; display: flex; align-items: center; justify-content: center; gap: 10px; font-size: 1rem; border: 2px solid #ddd;">
@@ -48,7 +48,7 @@
       <button id="btn-back-to-student" class="export-btn flex-icon" style="background-color: var(--wokwi-blue); color:white; border:none;">
         <i data-lucide="layout"></i> Vista Estudiante
       </button>
-      <button id="btn-logout-teacher" class="export-btn flex-icon btn-logout" style="background-color: var(--error-color); color:white; border:none;">
+      <button id="btn-logout-teacher" class="export-btn flex-icon btn-logout" data-action="logout" style="background-color: var(--error-color); color:white; border:none;">
         <i data-lucide="log-out"></i> Salir
       </button>
     </div>
@@ -284,8 +284,8 @@
           </div>
           <div id="pista-alto" class="pista-box"></div>
           <div id="btn-container-alto" style="display:flex; gap:10px; margin-top:12px;">
-             <button id="btn-alto" class="btn-verify flex-icon" onclick="window.verifyCode('alto')" style="flex:1;"><i data-lucide="play"></i> Verificar</button>
-             <button class="btn-verify flex-icon" onclick="window.llevarAlSimulador('alto')" style="flex:1; background:var(--wokwi-blue);"><i data-lucide="external-link"></i> Probar en Simulador</button>
+             <button data-action="verifyCode" data-nivel="alto" id="btn-alto" class="btn-verify flex-icon" style="flex:1;"><i data-lucide="play"></i> Verificar</button>
+             <button data-action="llevarAlSimulador" data-nivel="alto" class="btn-verify flex-icon" style="flex:1; background:var(--wokwi-blue);"><i data-lucide="external-link"></i> Probar en Simulador</button>
           </div>
           <div id="feedback-alto" class="feedback"></div>
         </div>
@@ -310,8 +310,8 @@
           </div>
           <div id="pista-superior" class="pista-box"></div>
           <div id="btn-container-superior" style="display:flex; gap:10px; margin-top:12px;">
-             <button id="btn-superior" class="btn-verify flex-icon" onclick="window.verifyCode('superior')" style="flex:1; background:var(--nivel-superior);"><i data-lucide="swords"></i> Enfrentar Boss</button>
-             <button class="btn-verify flex-icon" onclick="window.llevarAlSimulador('superior')" style="flex:1; background:var(--wokwi-blue);"><i data-lucide="external-link"></i> Probar en Simulador</button>
+             <button data-action="verifyCode" data-nivel="superior" id="btn-superior" class="btn-verify flex-icon" style="flex:1; background:var(--nivel-superior);"><i data-lucide="swords"></i> Enfrentar Boss</button>
+             <button data-action="llevarAlSimulador" data-nivel="superior" class="btn-verify flex-icon" style="flex:1; background:var(--wokwi-blue);"><i data-lucide="external-link"></i> Probar en Simulador</button>
           </div>
           <div id="feedback-superior" class="feedback"></div>
         </div>
@@ -330,14 +330,14 @@
   <div class="modal-box card">
     <div class="modal-header">
       <h2 style="margin: 0; border: none; padding: 0;" class="flex-icon"><i data-lucide="gamepad-2"></i> Zona Multijugador</h2>
-      <button class="close-btn flex-icon" onclick="window.cerrarModalGamificacion()"><i data-lucide="x"></i></button>
+      <button id="btn-cerrar-modal" class="close-btn flex-icon" data-action="cerrarModalGamificacion"><i data-lucide="x"></i></button>
     </div>
     
     <div class="modal-tabs">
       <button class="tab-btn active" id="btn-tab-ranking" data-action="cambiarTabGamificacion" data-tab="ranking"><i data-lucide="trophy"></i> Ranking Global</button>
       <button class="tab-btn" id="btn-tab-tienda" data-action="cambiarTabGamificacion" data-tab="tienda"><i data-lucide="shopping-bag"></i> Tienda de Perfil</button>
-      <button class="tab-btn" id="btn-tab-logros"><i data-lucide="award"></i> Mis Logros</button>
-      <button class="tab-btn" id="btn-tab-stats"><i data-lucide="bar-chart-2"></i> Estadísticas</button>
+      <button class="tab-btn" id="btn-tab-logros" data-action="cambiarTabGamificacion" data-tab="logros"><i data-lucide="award"></i> Mis Logros</button>
+      <button class="tab-btn" id="btn-tab-stats" data-action="cambiarTabGamificacion" data-tab="stats"><i data-lucide="bar-chart-2"></i> Estadísticas</button>
     </div>
 
     <div id="tab-ranking" class="tab-content" style="display:block;">
@@ -361,10 +361,10 @@
 
       <h4 style="border-bottom: 1px solid var(--border-color); padding-bottom: 8px; margin-bottom: 15px; margin-top: 25px;">🎨 Temas de la Plataforma</h4>
       <div class="store-grid" id="store-themes"></div>
-    </div>
 
-    <h4 style="border-bottom: 1px solid var(--border-color); padding-bottom: 8px; margin-bottom: 15px; margin-top: 25px;">⚡ Power-Ups</h4>
-    <div class="store-grid" id="store-powerups"></div>
+      <h4 style="border-bottom: 1px solid var(--border-color); padding-bottom: 8px; margin-bottom: 15px; margin-top: 25px;">⚡ Power-Ups</h4>
+      <div class="store-grid" id="store-powerups"></div>
+    </div>
     
     <div id="tab-stats" class="tab-content" style="display:none;">
       <div style="text-align: center; margin-bottom: 20px;">

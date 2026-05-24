@@ -1,17 +1,17 @@
 // ==============================================================
 // 1. IMPORTACIONES (Firebase Cloud SDKs 10.8.1 - CDN Oficial)
 // ==============================================================
-import { getState, updateState } from './modules/state.js';
+import { getState, updateState, subscribe } from './modules/state.js';
 import { GoogleGenerativeAI } from "https://cdn.jsdelivr.net/npm/@google/generative-ai@0.1.3/dist/index.min.js";
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js"; // Core Firebase app
 import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-analytics.js"; // Analytics
 // 🔒 CLAVES PRIVADAS: Se leen desde config.js (archivo local, NO versionado en GitHub)
 import { firebaseConfig, GEMINI_API_KEY, ADMIN_EMAIL } from './config.js';
-import { mensajesExito, mensajesFallo, competenciasMapa, weeks, tiendaItems, logrosDefiniciones, COLLECTIVE_CHALLENGE_GOAL } from './modules/constants.js'; // Existing import
-import { initializeAuth, setupAuthListener, loginWithGoogle, logoutUser } from './modules/auth.js'; // New import for auth module
-import { initializeFirestore, doc, setDoc, getDoc, updateDoc, increment, onSnapshot, addDoc, serverTimestamp, collection, query, where, orderBy, limit } from './modules/firestore.js'; // New import for firestore module
-import { initializeGamificationModule, getVidas, resetChallengeState, decrementVida, incrementFallo, unlockPista, cargarDatosGamificacion, abrirModalGamificacion, cerrarModalGamificacion, cambiarTabGamificacion, comprarArticulo, equiparArticulo, comprarPowerup, reclamarMonedas, ganarVolts, comprarEnergia, comprarPista, renderPistas, playCoinSound, playErrorSound, getMensajesExito, getMensajesFallo } from './modules/gamification.js'; // New import for gamification module
-import { initializeTeacherModule, iniciarAppDocente as teacherModuleIniciarAppDocente, renderTeacherDashboard, exportarCSV, cambiarTabDocente, renderTeacherManagementUI, addDocente, removeDocente, renderSecondaryTeacherUI, addMyGroup, removeMyGroup } from './modules/teacher.js'; // New import for teacher module
+import { mensajesExito, mensajesFallo, competenciasMapa, weeks, tiendaItems, logrosDefiniciones, COLLECTIVE_CHALLENGE_GOAL } from './modules/constants.js';
+import { initializeAuth, setupAuthListener, loginWithGoogle, logoutUser } from './modules/auth.js';
+import { initializeFirestore, doc, setDoc, getDoc, updateDoc, increment, onSnapshot, addDoc, serverTimestamp, collection, query, where, orderBy, limit } from './modules/firestore.js';
+import { initializeGamificationModule, initAudio, getVidas, resetChallengeState, decrementVida, incrementFallo, unlockPista, cargarDatosGamificacion, abrirModalGamificacion, cerrarModalGamificacion, cambiarTabGamificacion, comprarArticulo, equiparArticulo, comprarPowerup, reclamarMonedas, ganarVolts, comprarEnergia, comprarPista, renderPistas, playCoinSound, playErrorSound, getMensajesExito, getMensajesFallo } from './modules/gamification.js';
+import { initializeTeacherModule, iniciarAppDocente as teacherModuleIniciarAppDocente, renderTeacherDashboard, exportarCSV, cambiarTabDocente, renderTeacherManagementUI, addDocente, removeDocente, renderSecondaryTeacherUI, addMyGroup, removeMyGroup } from './modules/teacher.js';
 
 // ==============================================================
 // 2. CONFIGURACIÓN DE FIREBASE
@@ -31,6 +31,18 @@ let timers = {}; let intervalos = {};
 // Inicializar los módulos una sola vez, pasando las dependencias que no cambian.
 // Ahora los módulos obtendrán el estado dinámico (currentUser, etc.) desde state.js
 initializeTeacherModule(db, window.lucide.createIcons);
+
+// Suscriptor al estado global para actualizaciones automáticas de UI
+subscribe((state) => {
+    if (state.currentUser) {
+        const voltsEl = document.getElementById('volts-count');
+        const monedasEl = document.getElementById('user-monedas');
+        if (voltsEl) voltsEl.innerText = state.userData.volts || 0;
+        if (monedasEl) monedasEl.innerText = state.userData.monedas || 0;
+        aplicarTemaYAvatarUI();
+        renderCollectiveProgress();
+    }
+});
 
 /**
  * Muestra una notificación visual elegante (Toast).
@@ -231,20 +243,21 @@ async function handleCollectiveReward() {
  * Envía un mensaje a los compañeros del mismo grado.
  */
 async function broadcastActivity(mensaje) {
-  const { userData } = getState();
+  const { userData, currentUser } = getState();
   if (!userData.grado || userData.grado === 'ADMIN') return;
   try {
     await addDoc(collection(db, "notifications"), {
       mensaje,
       grado: userData.grado,
-      usuario: (userData.nombres || 'Alguien').split(' ')[0],
+      senderUid: currentUser.uid,
+      usuario: (userData.nombres || 'Estudiante').split(' ')[0],
       timestamp: serverTimestamp()
     });
   } catch (e) { console.error("Error broadcast:", e); }
 }
 
 function setupNotificationListener() {
-  const { userData } = getState();
+  const { userData, currentUser } = getState();
   if (!userData.grado || userData.grado === 'ADMIN') return;
   const q = query(collection(db, "notifications"), where("grado", "==", userData.grado), orderBy("timestamp", "desc"), limit(1));
   onSnapshot(q, (snapshot) => {
@@ -252,7 +265,7 @@ function setupNotificationListener() {
       if (change.type === "added") {
         const data = change.doc.data();
         const isFresh = data.timestamp && (Date.now() - data.timestamp.toMillis() < 10000);
-        if (isFresh && data.usuario !== userData.nombres.split(' ')[0]) {
+        if (isFresh && data.senderUid !== currentUser.uid) {
           showToast(`🚀 ${data.usuario}: ${data.mensaje}`, 'info');
         }
       }
@@ -428,7 +441,7 @@ async function verifyCode(nivel) {
       userData.savedCodes[`code_${currentRetoId}_${nivel}`] = originalCode;
       
       const isAlreadyDone = userData.progress[`reto_${currentRetoId}_${nivel}`] === true;
-      if (!isAlreadyDone) { window.ganarVolts(nivel === 'basico' ? 10 : (nivel === 'alto' ? 20 : 30)); } else playCoinSound(); 
+      if (!isAlreadyDone) { ganarVolts(nivel === 'basico' ? 10 : (nivel === 'alto' ? 20 : 30)); } else playCoinSound(); 
 
       userData.progress[`reto_${currentRetoId}_${nivel}`] = true;
       const currentRecord = userData.records[`record_${currentRetoId}_${nivel}`];
@@ -439,9 +452,19 @@ async function verifyCode(nivel) {
       saveToFirebase(); updateProgress(); setTimeout(() => { window.loadWeek(); }, 3500); 
 
     } else {
-      incrementFallo(nivel);
-      decrementVida(nivel);
-      playErrorSound();
+      // Lógica de Escudo Protector
+      const hasShield = userData.items?.shield > 0;
+      if (hasShield) {
+        updateState({ userData: { ...userData, items: { ...userData.items, shield: userData.items.shield - 1 } } });
+        playLifeSound(); // Sonido de protección
+        showToast("🛡️ ¡Escudo activado! No has perdido vidas.", "info");
+        saveToFirebase();
+      } else {
+        incrementFallo(nivel);
+        decrementVida(nivel);
+        playErrorSound();
+      }
+
       let corazones = ''; for(let i=0; i<3; i++) corazones += (i < getVidas()[nivel]) ? '❤️' : '🖤';
       document.getElementById(`vidas-${nivel}`).innerHTML = corazones;
       
@@ -455,14 +478,18 @@ async function verifyCode(nivel) {
         const explanation = await getGeminiExplanation(originalCode, `El código no cumple con la lógica del reto.`, reto.desc);
         document.getElementById(`gemini-explanation-${nivel}`).innerHTML = explanation;
 
-        document.getElementById(`btn-container-${nivel}`).innerHTML = `<button class="btn-comprar-vida flex-icon" onclick="window.comprarEnergia('${nivel}')"><i data-lucide="battery-charging"></i> Recuperar 3 ❤️ (10 🪙)</button>`;
+        document.getElementById(`btn-container-${nivel}`).innerHTML = `<button class="btn-comprar-vida flex-icon" data-action="comprarEnergia" data-nivel="${nivel}"><i data-lucide="battery-charging"></i> Recuperar 3 ❤️ (10 🪙)</button>`;
       } else {
         fb.innerHTML = `<div class="flex-icon"><i data-lucide="x-circle"></i> ${getMensajesFallo()[Math.floor(Math.random()*getMensajesFallo().length)]}</div>`;
-        if (getPistasDesbloqueadas()[nivel] === 0) unlockPista(nivel); // Unlock first hint if no hints are unlocked
+        if (getFallos()[nivel] >= 1 && getPistasDesbloqueadas()[nivel] === 0) unlockPista(nivel); 
         renderPistas(nivel, reto); // Render hints using the updated state
       }
     }
-    if (getVidas()[nivel] > 0) { btn.innerHTML = `<i data-lucide="play"></i> Verificar`; btn.disabled = false; }
+    // Solo rehabilitar si no fue un éxito (ya que el éxito dispara un reload de semana)
+    if (getVidas()[nivel] > 0 && !success) { 
+        btn.innerHTML = `<i data-lucide="play"></i> Verificar`; 
+        btn.disabled = false; 
+    }
     if (window.lucide) lucide.createIcons();
   }, 800);
 }
@@ -603,7 +630,14 @@ function resetProgress() {
 // ==============================================================
 function copyCode() { navigator.clipboard.writeText(document.getElementById('w-code').textContent).then(() => { const btn = document.getElementById('btnCopy'); const orig = btn.innerHTML; btn.innerHTML = `<i data-lucide="check"></i> Copiado`; window.lucide.createIcons(); setTimeout(() => { btn.innerHTML = orig; window.lucide.createIcons(); }, 2000); }); }
 function formatTime(sec) { return `${Math.floor(sec/60).toString().padStart(2,'0')}:${(sec%60).toString().padStart(2,'0')}`; }
-function iniciarTimerSiNecesario(nivel) { if (!intervalos[nivel] && getVidas()[nivel] > 0) { timers[nivel] = 0; document.getElementById(`timer-${nivel}`).textContent = `⏱ 00:00`; intervalos[nivel] = setInterval(() => { timers[nivel]++; document.getElementById(`timer-${nivel}`).textContent = `⏱ ${formatTime(timers[nivel])}`; }, 1000); } }
+function iniciarTimerSiNecesario(nivel) { 
+  const { userData, currentRetoId } = getState();
+  if (userData.progress[`reto_${currentRetoId}_${nivel}`]) return; // No iniciar timer si ya está completado
+  if (!intervalos[nivel] && getVidas()[nivel] > 0) { 
+    timers[nivel] = 0; document.getElementById(`timer-${nivel}`).textContent = `⏱ 00:00`; 
+    intervalos[nivel] = setInterval(() => { timers[nivel]++; document.getElementById(`timer-${nivel}`).textContent = `⏱ ${formatTime(timers[nivel])}`; }, 1000); 
+  } 
+}
 function stopTimer(nivel) { if (intervalos[nivel]) { clearInterval(intervalos[nivel]); intervalos[nivel] = null; } }
 
 function updateProgress() {
@@ -721,18 +755,9 @@ function descargarDiploma() {
 function setupEventListeners() {
     // Auth & UI Global
     document.getElementById('btn-login-google').addEventListener('click', loginConGoogle);
-    const btnLogout = document.getElementById('btn-logout');
-    if(btnLogout) btnLogout.addEventListener('click', logout);
 
     // Gamificación
     document.getElementById('btn-gamificacion').addEventListener('click', abrirModalGamificacion);
-    const btnCerrarModal = document.getElementById('btn-cerrar-modal');
-    if(btnCerrarModal) btnCerrarModal.addEventListener('click', cerrarModalGamificacion);
-    
-    document.getElementById('btn-tab-ranking').addEventListener('click', () => cambiarTabGamificacion('ranking'));
-    document.getElementById('btn-tab-tienda').addEventListener('click', () => cambiarTabGamificacion('tienda'));
-    document.getElementById('btn-tab-logros').addEventListener('click', () => cambiarTabGamificacion('logros'));
-    document.getElementById('btn-tab-stats').addEventListener('click', () => cambiarTabGamificacion('stats'));
     document.getElementById('btn-theme').addEventListener('click', toggleTheme);
     
     // Editor y Retos
@@ -755,7 +780,7 @@ function setupEventListeners() {
         const target = e.target.closest('[data-action]');
         
         // Manejo específico para botones que no tienen data-action pero están en el DOM dinámico
-        if (e.target.closest('#btn-logout')) { logout(); return; }
+        if (e.target.closest('.btn-logout')) { logout(); return; }
         if (e.target.closest('#btn-modo-admin')) { teacherModuleIniciarAppDocente(); return; }
         if (e.target.closest('#btn-back-to-student')) { iniciarAppEstudiante(); return; }
 
@@ -765,6 +790,7 @@ function setupEventListeners() {
         const nivel = target.dataset.nivel;
 
         switch (action) {
+            case 'logout': logout(); break;
             case 'verifyCode': verifyCode(nivel); break;
             case 'llevarAlSimulador': llevarAlSimulador(nivel); break;
             case 'reclamarMonedas': 
@@ -782,8 +808,11 @@ function setupEventListeners() {
             case 'resetCollectiveGoal':
                 import('./modules/teacher.js').then(m => m.resetCollectiveGoal());
                 break;
+            case 'cerrarModalGamificacion': cerrarModalGamificacion(); break;
+            case 'cambiarTabGamificacion': cambiarTabGamificacion(target.dataset.tab); break;
             case 'comprarEnergia': comprarEnergia(nivel); break;
             case 'comprarPista': comprarPista(nivel); break;
+            case 'comprarPowerup': comprarPowerup(target.dataset.id); break;
             case 'comprarArticulo': comprarArticulo(target.dataset.tipo, target.dataset.id); break;
             case 'equiparArticulo': equiparArticulo(target.dataset.tipo, target.dataset.id); break;
             case 'cambiarTabDocente': cambiarTabDocente(target.dataset.tab); break;
